@@ -1,121 +1,73 @@
 import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
+import { useRoom } from './useRoom'
+import Game from './Game'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [nickname, setNickname] = useState('')
+  const [code, setCode] = useState('')
+  const { room, connected, pending, error, send, playerId } = useRoom()
+  const disabled = !connected || pending
+  const isHost = room?.host_id === playerId
+
+  if (room?.game_state) {
+    return <Game room={room} game={room.game_state} playerId={playerId}
+      connected={connected} pending={pending} error={error}
+      onLeave={() => { void send('leave_room') }}
+      onRoll={() => send('roll_dice')}
+      onMove={(tileId) => { void send('move_piece', { tile_id: tileId }) }} />
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
+    <main className="lobby">
+      <header>
+        <h1>Pixies</h1>
+        <p role="status">{connected ? 'Connected' : 'Connecting…'}</p>
+      </header>
+      {error && <p className="error" role="alert">{error}</p>}
+      {room ? (
+        <section aria-labelledby="room-title">
+          <h2 id="room-title">Room <code>{room.code}</code></h2>
+          <p>Share this code with your friends.</p>
+          <ul className="players">
+            {Object.entries(room.players).map(([id, name]) => (
+              <li key={id}>
+                <span>{name}{id === playerId && ' (you)'}</span>
+                {id === room.host_id && <span className="badge">Host</span>}
+              </li>
+            ))}
           </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+          {room.started ? (
+            <p role="status">Game started!</p>
+          ) : isHost ? (
+            <button disabled={disabled} onClick={() => send('start_game')}>Start game</button>
+          ) : (
+            <p role="status">Waiting for the host to start the game…</p>
+          )}
+          <button className="secondary" disabled={disabled} onClick={() => send('leave_room')}>
+            Leave room
+          </button>
+        </section>
+      ) : (
+        <form onSubmit={(event) => {
+          event.preventDefault()
+          void send('join_room', { nickname: nickname.trim(), code: code.trim() })
+        }}>
+          <label htmlFor="nickname">Nickname</label>
+          <input id="nickname" value={nickname} onChange={(event) => setNickname(event.target.value)}
+            maxLength={30} required autoComplete="nickname" />
+          <button type="button" disabled={disabled || !nickname.trim()}
+            onClick={() => send('create_room', { nickname: nickname.trim() })}>
+            Create room
+          </button>
+          <div className="divider">or join a room</div>
+          <label htmlFor="code">Room code</label>
+          <input id="code" value={code} onChange={(event) => setCode(event.target.value.toUpperCase())}
+            maxLength={6} required autoComplete="off" spellCheck={false} />
+          <button type="submit" disabled={disabled || !nickname.trim() || !code.trim()}>Join room</button>
+        </form>
+      )}
+    </main>
   )
 }
 
