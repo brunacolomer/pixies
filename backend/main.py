@@ -1,6 +1,14 @@
+import socketio
 from fastapi import FastAPI
-app = FastAPI()
 
-@app.get("/")
-def main():
-    return {"message": "Hello World"}
+from events import sio
+
+api = FastAPI()
+
+
+@api.get('/')
+def health():
+    return {'status': 'ok'}
+
+
+app = socketio.ASGIApp(sio, other_asgi_app=api)
